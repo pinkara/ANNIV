@@ -6,7 +6,7 @@
     <title>京香のスイーツアトリエ</title>
   <!--favicon -->
     <link rel="icon" type="image/png" href="https://pinkara.github.io/ANNIV/favicon/favicon.png">
-    <!-- Tailwind CSS -->
+        <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Google Fonts (Zen Maru Gothic pour le japonais mignon) -->
     <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
@@ -51,12 +51,6 @@
 
         /* Curseur couteau pour le beurre */
         .cursor-knife { cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><path fill="gray" d="M3 21v-2h2V5h14v14h2v2H3z"/></svg>'), auto; }
-        
-        /* Style texte vertical pour les certificats */
-        .vertical-text {
-            writing-mode: vertical-rl;
-            text-orientation: upright;
-        }
     </style>
 </head>
 <body class="fixed inset-0 flex items-center justify-center bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]">
@@ -352,12 +346,34 @@
             if (state.score > 500) { title = "カリスマシェフ"; message = "お店に出せるレベル！"; stars = 3; }
             if (state.score > 580) { title = "伝説のパティシエ"; message = "完璧すぎる…！"; stars = 5; }
 
+            // CONSTRUCTION DU GÂTEAU FINAL (Non interactif)
+            const finalCakeHTML = `
+                <div class="relative w-56 md:w-64 h-40 md:h-48 bg-[#F4A460] rounded-t-lg rounded-b-2xl shadow-lg border-b-8 border-[#D2691E] z-10 mx-auto my-4 transform scale-100">
+                    <div class="absolute top-0 w-full h-16 md:h-20 bg-pink-300 rounded-b-[30px] shadow-sm opacity-90 pointer-events-none"></div>
+                    <div class="absolute inset-0 w-full h-full pointer-events-none">
+                        ${state.decorations.map(d => `
+                            <div class="absolute transform -translate-x-1/2 -translate-y-1/2 text-3xl filter drop-shadow-md" 
+                                    style="left:${d.x}%; top:${d.y}%; font-size:${d.size}px; transform: translate(-50%, -50%) rotate(${d.rot}deg)">
+                                ${d.char}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                <!-- Assiette sous le gâteau -->
+                <div class="w-64 md:w-80 h-8 md:h-10 bg-gray-300 rounded-[50%] shadow-xl mx-auto -mt-6 mb-6"></div>
+            `;
+
             mainContent.innerHTML = `
-                <div class="flex flex-col items-center justify-center h-full text-center relative z-10 animate-pop-in px-4">
-                    <h1 class="text-3xl md:text-4xl text-pink-500 font-bold mb-2">お誕生日おめでとう！</h1>
-                    <h2 class="text-5xl font-bold text-gray-800 mb-6">京香ちゃん</h2>
+                <div class="flex flex-col items-center justify-center h-full text-center relative z-10 animate-pop-in px-4 overflow-y-auto">
+                    <h1 class="text-3xl md:text-4xl text-pink-500 font-bold mb-2 mt-4 shrink-0">お誕生日おめでとう！</h1>
+                    <h2 class="text-5xl font-bold text-gray-800 mb-2 shrink-0">京香ちゃん</h2>
                     
-                    <div class="bg-white p-6 md:p-8 rounded-2xl shadow-2xl border-4 border-yellow-200 my-4 md:my-8 max-w-lg transform rotate-1 w-full">
+                    <!-- INSERTION DU GÂTEAU -->
+                    <div class="shrink-0">
+                        ${finalCakeHTML}
+                    </div>
+                    
+                    <div class="bg-white p-6 md:p-8 rounded-2xl shadow-2xl border-4 border-yellow-200 mb-4 max-w-lg transform rotate-1 w-full shrink-0">
                         <div class="uppercase tracking-widest text-xs font-bold text-gray-400 mb-2">パティシエ認定証</div>
                         <h2 class="text-2xl md:text-3xl font-bold text-gray-800 mb-2">${title}</h2>
                         <div class="flex justify-center gap-1 text-yellow-400 text-2xl mb-4">
@@ -375,7 +391,7 @@
                         </div>
                     </div>
 
-                    <button onclick="location.reload()" class="bg-white text-pink-500 px-6 py-2 rounded-full font-bold shadow hover:bg-gray-50 mt-4">もう一度作る</button>
+                    <button onclick="location.reload()" class="bg-white text-pink-500 px-6 py-2 rounded-full font-bold shadow hover:bg-gray-50 mb-8 shrink-0">もう一度作る</button>
                 </div>
             `;
             startConfetti();
