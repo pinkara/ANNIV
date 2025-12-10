@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>京香のスイーツアトリエ</title>
+  <!--favicon -->
+    <link rel="icon" type="image/png" href="https://pinkara.github.io/ANNIV/favicon/favicon.png">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts (Zen Maru Gothic pour le japonais mignon) -->
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body {
+            font-family: 'Zen Maru Gothic', sans-serif;
+            background-color: #FFF0F5; /* Lavender Blush */
+            overflow: hidden;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        /* Animations Custom */
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        .animate-float { animation: float 3s ease-in-out infinite; }
+        
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            80% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .pop-in { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+
+        /* ANIMATION DU FOUET */
+        @keyframes whisking {
+            0% { transform: translate(0, 0) rotate(0deg); }
+            25% { transform: translate(-5px, 5px) rotate(-15deg); }
+            50% { transform: translate(0, 10px) rotate(0deg); }
+            75% { transform: translate(5px, 5px) rotate(15deg); }
+            100% { transform: translate(0, 0) rotate(0deg); }
+        }
+        .animate-whisk-action {
+            animation: whisking 0.15s linear infinite;
+        }
+
+        /* Curseur couteau pour le beurre */
+        .cursor-knife { cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><path fill="gray" d="M3 21v-2h2V5h14v14h2v2H3z"/></svg>'), auto; }
+        
+        /* Style texte vertical pour les certificats */
+        .vertical-text {
+            writing-mode: vertical-rl;
+            text-orientation: upright;
+        }
+    </style>
+</head>
+<body class="fixed inset-0 flex items-center justify-center bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]">
+
+    <!-- CONTENEUR PRINCIPAL -->
+    <div id="game-container" class="relative w-full h-full md:max-w-5xl md:h-[85vh] bg-white/90 backdrop-blur-md md:rounded-3xl shadow-2xl overflow-hidden border-0 md:border-4 border-white flex flex-col">
+        
+        <!-- HEADER -->
+        <header class="h-16 flex justify-between items-center px-4 md:px-8 bg-pink-100/50 border-b border-pink-200 shrink-0">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-cake-candles text-pink-500 text-2xl"></i>
+                <span class="text-xl font-bold text-pink-600">京香のアトリエ</span>
+            </div>
+            <div id="score-display" class="hidden bg-white px-4 py-1 rounded-full shadow-sm border border-pink-200">
+                <span class="text-xs font-bold text-gray-400">SCORE</span>
+                <span id="score-value" class="text-xl font-bold text-pink-500 ml-2">0</span>
+            </div>
+        </header>
+
+        <!-- ZONE DE CONTENU -->
+        <main id="main-content" class="flex-1 relative w-full h-full p-4 md:p-8 overflow-y-auto overflow-x-hidden">
+            <!-- Injecté par JS -->
+        </main>
+
+        <!-- OVERLAY MINI-JEUX -->
+        <div id="minigame-overlay" class="hidden absolute inset-0 bg-black/70 z-50 flex items-center justify-center backdrop-blur-sm p-4">
+            <div id="minigame-card" class="bg-white rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-lg text-center relative overflow-hidden transition-all duration-300 transform scale-95 opacity-0">
+            </div>
+        </div>
+
+        <!-- CONFETTIS -->
+        <canvas id="confetti-canvas" class="absolute inset-0 pointer-events-none z-40 hidden"></canvas>
+    </div>
+
+    <!-- SCRIPTS -->
+    <script>
+        // --- ÉTAT DU JEU ---
+        const state = {
+            step: 'intro', 
+            score: 0,
+            ingredients: {
+                flour: { name: "小麦粉", icon: "fa-wheat-awn", color: "bg-amber-100", done: false, score: 0 },
+                sugar: { name: "砂糖", icon: "fa-cube", color: "bg-white", done: false, score: 0 },
+                eggs: { name: "卵", icon: "fa-egg", color: "bg-yellow-100", done: false, score: 0 },
+                butter: { name: "バター", icon: "fa-cheese", color: "bg-yellow-200", done: false, score: 0 },
+                milk: { name: "牛乳", icon: "fa-bottle-droplet", color: "bg-blue-50", done: false, score: 0 },
+                choco: { name: "チョコ", icon: "fa-cookie", color: "bg-amber-800 text-white", done: false, score: 0 }
+            },
+            decorations: [],
+            mixProgress: 0,
+            bakeProgress: 0
+        };
+
+        const mainContent = document.getElementById('main-content');
+        const minigameOverlay = document.getElementById('minigame-overlay');
+        const minigameCard = document.getElementById('minigame-card');
+        const scoreDisplay = document.getElementById('score-display');
+        const scoreValue = document.getElementById('score-value');
+        const confettiCanvas = document.getElementById('confetti-canvas');
+
+        // --- MOTEUR DE RENDU ---
+
+        function render() {
+            scoreValue.textContent = state.score;
+            scoreDisplay.classList.toggle('hidden', state.step === 'intro');
+            mainContent.innerHTML = ''; 
+
+            switch (state.step) {
+                case 'intro': renderIntro(); break;
+                case 'ingredients': renderIngredients(); break;
+                case 'mixing': renderMixing(); break;
+                case 'baking': renderBaking(); break;
+                case 'decorating': renderDecorating(); break;
+                case 'finish': renderFinish(); break;
+            }
+        }
+
+        // --- VUES ---
+
+        function renderIntro() {
+            mainContent.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full text-center space-y-6 md:space-y-8 animate-float px-2">
+                    <div class="relative">
+                        <i class="fa-solid fa-hat-chef text-7xl md:text-8xl text-pink-400 mb-4"></i>
+                        <i class="fa-solid fa-star text-yellow-400 text-3xl md:text-4xl absolute -top-2 -right-6 animate-spin"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-4xl md:text-5xl text-gray-800 drop-shadow-sm font-bold mb-2">お誕生日おめでとう！</h1>
+                        <h2 class="text-5xl md:text-6xl text-pink-500 font-bold tracking-widest">京香ちゃん</h2>
+                    </div>
+                    <p class="text-lg md:text-xl text-gray-600 max-w-md mx-auto leading-relaxed font-medium">
+                        今日はあなたが主役のパティシエです！<br>
+                        世界で一番おいしいケーキを作りましょう！
+                    </p>
+                    <button onclick="startGame()" class="bg-gradient-to-r from-pink-400 to-rose-400 hover:from-pink-500 hover:to-rose-500 text-white font-bold py-3 md:py-4 px-10 md:px-16 rounded-full text-lg md:text-xl shadow-xl transform transition hover:scale-105 active:scale-95 tracking-wider">
+                        <i class="fa-solid fa-play mr-2"></i> スタート
+                    </button>
+                </div>
+            `;
+        }
+
+        function renderIngredients() {
+            const allDone = Object.values(state.ingredients).every(i => i.done);
+            let gridHtml = '<div class="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6 max-w-4xl mx-auto w-full">';
+            
+            for (const [key, ing] of Object.entries(state.ingredients)) {
+                const statusClass = ing.done 
+                    ? 'border-green-400 bg-green-50 opacity-80 cursor-default' 
+                    : 'border-white hover:border-pink-300 hover:shadow-xl cursor-pointer transform hover:-translate-y-1 active:scale-95';
+                
+                const scoreBadge = ing.done 
+                    ? `<div class="absolute top-2 right-2 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow">${ing.score}点</div>` 
+                    : '';
+                
+                gridHtml += `
+                    <div onclick="${ing.done ? '' : `launchMinigame('${key}')`}" class="relative ${statusClass} ${ing.color} p-4 md:p-6 rounded-2xl border-4 shadow-md transition-all duration-300 flex flex-col items-center justify-center h-32 md:h-48 group">
+                        ${scoreBadge}
+                        <i class="fa-solid ${ing.icon} text-3xl md:text-5xl mb-2 md:mb-4 transition-transform group-hover:scale-110"></i>
+                        <h3 class="font-bold text-gray-700 text-sm md:text-xl">${ing.name}</h3>
+                        ${ing.done ? '' : '<span class="text-xs md:text-sm text-gray-500 mt-1 md:mt-2 font-bold group-hover:text-pink-500">追加する</span>'}
+                        ${ing.done ? '<div class="absolute inset-0 flex items-center justify-center bg-white/30 backdrop-blur-[1px] rounded-xl"><i class="fa-solid fa-check-circle text-5xl text-green-500 drop-shadow-md pop-in"></i></div>' : ''}
+                    </div>
+                `;
+            }
+            gridHtml += '</div>';
+
+            const nextBtn = allDone 
+                ? `<button onclick="setState('mixing')" class="mt-8 bg-pink-500 hover:bg-pink-600 text-white font-bold py-3 px-10 rounded-full text-lg shadow-lg animate-bounce w-full md:w-auto">まぜまぜタイムへ <i class="fa-solid fa-arrow-right ml-2"></i></button>`
+                : `<div class="mt-4 md:mt-8 text-gray-400 font-bold text-sm md:text-base">すべての材料を集めてね！</div>`;
+
+            mainContent.innerHTML = `
+                <div class="flex flex-col items-center h-full overflow-y-auto">
+                    <h2 class="text-2xl md:text-3xl font-bold text-gray-800 mb-2">ステップ1：材料あつめ</h2>
+                    <p class="text-sm md:text-base text-gray-600 mb-4 md:mb-8">アイコンをタップして材料をボウルに入れよう！</p>
+                    ${gridHtml}
+                    ${nextBtn}
+                    <div class="h-8 md:hidden"></div>
+                </div>
+            `;
+        }
+
+        function renderMixing() {
+            mainContent.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full space-y-8">
+                    <h2 class="text-3xl font-bold text-gray-800">ステップ2：レッツ・ミキシング！</h2>
+                    
+                    <!-- BOL -->
+                    <div class="relative w-64 h-64">
+                        <div class="absolute inset-0 rounded-full border-4 border-gray-200 bg-white shadow-inner overflow-hidden flex items-center justify-center">
+                            <!-- Couleur crème vanille au lieu de jaune vif -->
+                            <div id="batter" class="w-full bg-[#FFFDD0] transition-all duration-200 origin-bottom" style="height: ${state.mixProgress}%; transform: rotate(${state.mixProgress * 3}deg) scale(${0.5 + state.mixProgress/200})"></div>
+                        </div>
+                        <div class="absolute inset-0 pointer-events-none border-8 border-gray-300 rounded-full shadow-2xl"></div>
+                        
+                        <!-- VRAI FOUET SVG -->
+                        <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div id="whisk-rotator" class="w-24 h-24 flex items-center justify-center origin-center -mt-8">
+                                <svg width="100%" height="100%" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" class="drop-shadow-lg">
+                                    <!-- Manche -->
+                                    <rect x="45" y="0" width="10" height="30" rx="2" fill="#333" />
+                                    <!-- Fils -->
+                                    <path d="M50 30 C 20 30, 20 90, 50 90 C 80 90, 80 30, 50 30" stroke="#888" stroke-width="2" fill="none"/>
+                                    <path d="M50 30 C 30 30, 30 90, 50 90 C 70 90, 70 30, 50 30" stroke="#999" stroke-width="2" fill="none"/>
+                                    <path d="M50 30 C 40 30, 40 90, 50 90 C 60 90, 60 30, 50 30" stroke="#AAA" stroke-width="2" fill="none"/>
+                                    <path d="M50 30 L 50 90" stroke="#BBB" stroke-width="2" />
+                                    <!-- Attache -->
+                                    <rect x="44" y="28" width="12" height="5" fill="#555" />
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PROGRESS BAR -->
+                    <div class="w-64 max-w-md h-6 bg-gray-200 rounded-full overflow-hidden border border-gray-300">
+                        <div class="h-full bg-gradient-to-r from-pink-300 to-pink-500 transition-all duration-200" style="width: ${state.mixProgress}%"></div>
+                    </div>
+
+                    <!-- Bouton ROSE au lieu de jaune -->
+                    <button 
+                        onmousedown="mixBatter()" 
+                        ontouchstart="event.preventDefault(); mixBatter()" 
+                        class="select-none active:scale-95 active:bg-pink-600 bg-pink-500 hover:bg-pink-400 text-white font-bold w-32 h-32 rounded-full shadow-lg border-4 border-pink-200 flex flex-col items-center justify-center transition-all touch-manipulation"
+                    >
+                        <i class="fa-solid fa-rotate text-3xl mb-1"></i>
+                        <span>まぜる！</span>
+                    </button>
+                    <p class="text-sm text-gray-500 font-bold">ボタンを連打してね！</p>
+                </div>
+            `;
+        }
+
+        function renderBaking() {
+            mainContent.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full">
+                    <h2 class="text-3xl font-bold text-gray-800 mb-8">ステップ3：焼き上げ</h2>
+                    
+                    <div class="relative bg-gray-800 p-4 rounded-xl shadow-2xl w-full max-w-xs">
+                        <div class="relative w-full h-48 bg-gray-900 rounded-lg overflow-hidden border-2 border-gray-700">
+                            <div class="absolute inset-0 bg-orange-500/20 animate-pulse"></div>
+                            <div id="cake-baking" class="absolute bottom-0 left-1/2 -translate-x-1/2 w-40 bg-[#F4A460] rounded-t-lg transition-all duration-[100ms] shadow-inner" style="height: 0%"></div>
+                            <div class="absolute top-0 right-0 w-full h-full bg-gradient-to-bl from-white/10 to-transparent pointer-events-none"></div>
+                        </div>
+                        <div class="flex justify-between items-center mt-4 bg-gray-700 p-2 rounded">
+                            <div class="flex gap-2">
+                                <div class="w-3 h-3 rounded-full bg-red-500 animate-pulse shadow-[0_0_10px_red]"></div>
+                                <div class="w-3 h-3 rounded-full bg-green-900"></div>
+                            </div>
+                            <div class="font-mono text-red-500 text-xl font-bold" id="oven-timer">0%</div>
+                        </div>
+                    </div>
+                    <p class="mt-8 text-gray-500 font-bold">ふっくら膨らむかな…？</p>
+                </div>
+            `;
+            
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += 0.5;
+                state.bakeProgress = progress;
+                const cake = document.getElementById('cake-baking');
+                const timer = document.getElementById('oven-timer');
+                if(cake) cake.style.height = `${progress * 0.7}%`;
+                if(timer) timer.innerText = `${Math.floor(progress)}%`;
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    setTimeout(() => setState('decorating'), 1000);
+                }
+            }, 30);
+        }
+
+        function renderDecorating() {
+            mainContent.innerHTML = `
+                <div class="flex flex-col md:flex-row h-full gap-4 items-center md:items-stretch">
+                    <!-- ZONE GÂTEAU -->
+                    <div class="flex-1 w-full bg-blue-50 rounded-3xl shadow-inner relative flex items-center justify-center overflow-hidden shrink-0 h-3/5 md:h-auto">
+                        <div class="absolute top-4 text-center w-full pointer-events-none opacity-50 text-xs md:text-sm px-4 font-bold">ケーキをタップして飾り付けよう！</div>
+                        <div class="absolute bottom-8 md:bottom-12 w-64 md:w-80 h-8 md:h-10 bg-gray-300 rounded-[50%] shadow-xl"></div>
+                        <div class="relative w-56 md:w-64 h-40 md:h-48 bg-[#F4A460] rounded-t-lg rounded-b-2xl shadow-lg border-b-8 border-[#D2691E] z-10 cursor-crosshair active:scale-[0.99] transition-transform touch-manipulation" 
+                             onclick="addDecoration(event)">
+                            <div class="absolute top-0 w-full h-16 md:h-20 bg-pink-300 rounded-b-[30px] shadow-sm opacity-90 pointer-events-none"></div>
+                            <div id="decorations-container" class="absolute inset-0 w-full h-full pointer-events-none">
+                                ${state.decorations.map(d => `
+                                    <div class="absolute transform -translate-x-1/2 -translate-y-1/2 text-3xl filter drop-shadow-md animate-pop-in" 
+                                         style="left:${d.x}%; top:${d.y}%; font-size:${d.size}px; transform: translate(-50%, -50%) rotate(${d.rot}deg)">
+                                        ${d.char}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- OUTILS -->
+                    <div class="w-full md:w-64 bg-white rounded-t-3xl md:rounded-3xl shadow-xl p-4 flex flex-col h-2/5 md:h-auto">
+                        <h3 class="font-bold text-gray-700 mb-2 md:mb-4 text-center text-sm md:text-base">デコレーション</h3>
+                        <div class="grid grid-cols-4 md:grid-cols-2 gap-2 flex-1 overflow-y-auto content-start">
+                            ${getDecorationButtons()}
+                        </div>
+                        <div class="mt-2 md:mt-4 pt-2 md:pt-4 border-t flex flex-row md:flex-col gap-2">
+                             <button onclick="undoDecoration()" class="flex-1 bg-gray-200 hover:bg-gray-300 py-3 md:py-2 rounded-lg text-gray-700 text-xs md:text-sm font-bold"><i class="fa-solid fa-rotate-left"></i> ひとつ戻す</button>
+                             <button onclick="setState('finish')" class="flex-1 bg-pink-500 hover:bg-pink-600 text-white font-bold py-3 rounded-lg shadow-lg text-sm md:text-base">完成！ ✨</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        let currentTool = 'strawberry';
+        const tools = [
+            {id: 'strawberry', icon: '🍓', label: 'いちご'},
+            {id: 'candle', icon: '🕯️', label: 'ろうそく'},
+            {id: 'cream', icon: '☁️', label: 'クリーム'},
+            {id: 'star', icon: '⭐', label: '星'},
+            {id: 'heart', icon: '❤️', label: 'ハート'},
+            {id: 'choco', icon: '🍫', label: 'チョコ'},
+            {id: 'flower', icon: '🌸', label: 'お花'},
+            {id: 'text', icon: '京香', label: '名前', textMode: true}
+        ];
+
+        function getDecorationButtons() {
+            return tools.map(t => `
+                <button onclick="selectTool('${t.id}')" class="p-2 rounded-xl border-2 transition-all flex flex-col items-center justify-center ${currentTool === t.id ? 'border-pink-500 bg-pink-50 ring-2 ring-pink-200' : 'border-transparent hover:bg-gray-50'} active:scale-95 touch-manipulation">
+                    <span class="text-2xl md:text-2xl">${t.icon}</span>
+                    <span class="text-[10px] md:text-xs font-bold text-gray-500 hidden md:block">${t.label}</span>
+                </button>
+            `).join('');
+        }
+
+        function renderFinish() {
+            let title = "見習いパティシエ";
+            let message = "いい感じ！";
+            let stars = 1;
+
+            if (state.score > 300) { title = "一人前のパティシエ"; message = "とっても美味しそう！"; stars = 2; }
+            if (state.score > 500) { title = "カリスマシェフ"; message = "お店に出せるレベル！"; stars = 3; }
+            if (state.score > 580) { title = "伝説のパティシエ"; message = "完璧すぎる…！"; stars = 5; }
+
+            mainContent.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full text-center relative z-10 animate-pop-in px-4">
+                    <h1 class="text-3xl md:text-4xl text-pink-500 font-bold mb-2">お誕生日おめでとう！</h1>
+                    <h2 class="text-5xl font-bold text-gray-800 mb-6">京香ちゃん</h2>
+                    
+                    <div class="bg-white p-6 md:p-8 rounded-2xl shadow-2xl border-4 border-yellow-200 my-4 md:my-8 max-w-lg transform rotate-1 w-full">
+                        <div class="uppercase tracking-widest text-xs font-bold text-gray-400 mb-2">パティシエ認定証</div>
+                        <h2 class="text-2xl md:text-3xl font-bold text-gray-800 mb-2">${title}</h2>
+                        <div class="flex justify-center gap-1 text-yellow-400 text-2xl mb-4">
+                            ${Array(stars).fill('<i class="fa-solid fa-star"></i>').join('')}
+                        </div>
+                        <p class="text-gray-600 font-bold text-sm md:text-base">"${message}"</p>
+                        <div class="mt-6 pt-6 border-t border-gray-100 flex justify-between items-end">
+                            <div class="text-left">
+                                <div class="text-xs text-gray-400 font-bold">トータルスコア</div>
+                                <div class="text-xl md:text-2xl font-bold text-pink-500">${state.score} 点</div>
+                            </div>
+                            <div class="h-12 w-12 md:h-16 md:w-16 bg-pink-100 rounded-full flex items-center justify-center text-pink-500 text-xl md:text-2xl">
+                                <i class="fa-solid fa-medal"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onclick="location.reload()" class="bg-white text-pink-500 px-6 py-2 rounded-full font-bold shadow hover:bg-gray-50 mt-4">もう一度作る</button>
+                </div>
+            `;
+            startConfetti();
+        }
+
+        // --- LOGIQUE GLOBALE ---
+
+        function startGame() { setState('ingredients'); }
+        function setState(newState) { state.step = newState; render(); }
+
+        function mixBatter() {
+            if (state.mixProgress < 100) {
+                state.mixProgress += 5;
+                const whisk = document.getElementById('whisk-rotator');
+                whisk.classList.remove('animate-whisk-action');
+                void whisk.offsetWidth; 
+                whisk.classList.add('animate-whisk-action');
+                setTimeout(() => { whisk.classList.remove('animate-whisk-action'); }, 300);
+                renderMixing(); 
+                document.getElementById('whisk-rotator').classList.add('animate-whisk-action');
+                if (state.mixProgress >= 100) { setTimeout(() => setState('baking'), 500); }
+            }
+        }
+
+        function selectTool(id) { currentTool = id; renderDecorating(); }
+
+        function addDecoration(e) {
+            if (state.step !== 'decorating') return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            const x = ((e.clientX - rect.left) / rect.width) * 100;
+            const y = ((e.clientY - rect.top) / rect.height) * 100;
+            const tool = tools.find(t => t.id === currentTool);
+            const char = tool.textMode ? '<span class="text-xs font-bold bg-white px-2 py-1 rounded shadow text-pink-500 border border-pink-200">京香</span>' : tool.icon;
+            const size = tool.textMode ? 16 : (Math.random() * 10 + 30);
+            state.decorations.push({ x, y, char, size, rot: Math.random() * 40 - 20 });
+            renderDecorating();
+        }
+
+        function undoDecoration() { state.decorations.pop(); renderDecorating(); }
+
+        // --- SYSTÈME DE MINI-JEUX ---
+        function launchMinigame(ingredientKey) {
+            const ing = state.ingredients[ingredientKey];
+            minigameOverlay.classList.remove('hidden');
+            minigameCard.classList.remove('opacity-0', 'scale-95');
+            minigameCard.classList.add('opacity-100', 'scale-100');
+            
+            let gameHTML = `<h3 class="text-2xl font-bold mb-4 text-gray-800">${ing.name}</h3>`;
+            
+            if (ingredientKey === 'flour') {
+                gameHTML += `
+                    <p class="mb-4 text-gray-600 font-bold">ボタン長押しで 500g ぴったり入れよう！</p>
+                    <div class="relative w-full h-8 bg-gray-200 rounded-full mb-2 overflow-hidden">
+                        <div id="game-bar" class="h-full bg-stone-300 w-0"></div>
+                        <div class="absolute top-0 bottom-0 w-1 bg-red-500 left-[80%] z-10"></div>
+                    </div>
+                    <div class="text-4xl font-mono font-bold mb-6" id="game-value">0g</div>
+                    <button id="action-btn" class="w-full py-4 bg-pink-500 text-white font-bold rounded-xl shadow-lg active:scale-95 transition-transform touch-manipulation">入れる</button>
+                `;
+                minigameCard.innerHTML = gameHTML;
+                const btn = document.getElementById('action-btn');
+                const valDisplay = document.getElementById('game-value');
+                const bar = document.getElementById('game-bar');
+                let val = 0; let interval;
+                const startPour = () => { if(interval) clearInterval(interval); interval = setInterval(() => { val += 5; valDisplay.innerText = val + "g"; bar.style.width = (val / 600 * 100) + "%"; }, 20); };
+                const stopPour = () => { clearInterval(interval); let score = 0; let diff = Math.abs(val - 500); if (diff < 20) score = 100; else if (diff < 50) score = 70; else if (diff < 100) score = 40; else score = 10; endMinigame(ingredientKey, score); };
+                btn.addEventListener('mousedown', startPour); btn.addEventListener('mouseup', stopPour); btn.addEventListener('touchstart', (e) => { e.preventDefault(); startPour(); }); btn.addEventListener('touchend', (e) => { e.preventDefault(); stopPour(); });
+            } 
+            else if (ingredientKey === 'sugar') {
+                gameHTML += `
+                    <p class="mb-4 text-gray-600 font-bold">画面を連打して砂糖を入れよう！</p>
+                    <div class="flex justify-center mb-6"><i id="sugar-shaker" class="fa-solid fa-cube text-6xl text-gray-300 transition-transform"></i></div>
+                    <div class="w-full h-4 bg-gray-200 rounded-full overflow-hidden"><div id="game-bar" class="h-full bg-blue-400 w-0 transition-all duration-75"></div></div>
+                    <div class="absolute inset-0 z-10" id="tap-zone"></div>
+                `;
+                minigameCard.innerHTML = gameHTML;
+                const shaker = document.getElementById('sugar-shaker'); const bar = document.getElementById('game-bar'); const zone = document.getElementById('tap-zone'); let count = 0; const target = 20;
+                const tapAction = (e) => { if(e) e.preventDefault(); count++; shaker.style.transform = `rotate(${Math.random()*20 - 10}deg) scale(1.1)`; setTimeout(() => shaker.style.transform = 'rotate(0deg) scale(1)', 50); bar.style.width = (count / target * 100) + "%"; if (count >= target) { zone.onclick = null; zone.ontouchend = null; endMinigame(ingredientKey, 100); } };
+                zone.onclick = tapAction; zone.ontouchend = tapAction;
+            }
+            else if (ingredientKey === 'eggs') {
+                gameHTML += `
+                    <p class="mb-4 text-gray-600 font-bold">赤い輪が卵に重なったらタップ！</p>
+                    <div class="relative w-48 h-48 mx-auto flex items-center justify-center cursor-pointer" id="egg-zone">
+                        <i class="fa-solid fa-egg text-6xl text-yellow-500 z-10"></i>
+                        <div id="target-ring" class="absolute border-4 border-red-500 rounded-full w-full h-full opacity-50"></div>
+                        <div class="absolute border-2 border-green-500 rounded-full w-16 h-16 opacity-30"></div>
+                    </div>
+                `;
+                minigameCard.innerHTML = gameHTML;
+                const ring = document.getElementById('target-ring'); const zone = document.getElementById('egg-zone'); let size = 100; let shrinking = true; let stopped = false;
+                const anim = setInterval(() => { if(stopped) return; if(shrinking) size -= 2; else size += 2; if(size <= 0) shrinking = false; if(size >= 100) shrinking = true; ring.style.width = size + "%"; ring.style.height = size + "%"; }, 20);
+                const checkEgg = (e) => { if(e) e.preventDefault(); if(stopped) return; stopped = true; clearInterval(anim); let score = 0; let diff = Math.abs(size - 33); if (diff < 8) score = 100; else if (diff < 20) score = 70; else score = 20; endMinigame(ingredientKey, score); };
+                zone.addEventListener('mousedown', checkEgg); zone.addEventListener('touchstart', checkEgg);
+            }
+            else if (ingredientKey === 'butter') {
+                gameHTML += `
+                    <p class="mb-4 text-gray-600 font-bold">真ん中でストップ！</p>
+                    <div class="relative w-full h-32 bg-yellow-100 rounded-lg flex items-center justify-center overflow-hidden border border-yellow-200">
+                        <div class="w-32 h-20 bg-yellow-300 rounded shadow-md border border-yellow-400"></div>
+                        <div class="absolute w-1 h-full bg-green-500 opacity-20 left-1/2 -translate-x-1/2"></div>
+                        <div id="knife" class="absolute top-0 bottom-0 w-1 bg-gray-800 shadow-xl" style="left:0%"><div class="w-4 h-16 bg-black rounded absolute -top-4 -left-1.5"></div></div>
+                    </div>
+                    <button id="stop-btn" class="mt-6 w-full py-4 bg-gray-800 text-white font-bold rounded-xl active:scale-95 touch-manipulation">切る！</button>
+                `;
+                minigameCard.innerHTML = gameHTML;
+                const knife = document.getElementById('knife'); let pos = 0; let dir = 1; let stopped = false;
+                const anim = setInterval(() => { if(stopped) return; pos += 2 * dir; if (pos > 100 || pos < 0) dir *= -1; knife.style.left = pos + "%"; }, 10);
+                const stopKnife = (e) => { if(e) e.preventDefault(); if(stopped) return; stopped = true; clearInterval(anim); let diff = Math.abs(pos - 50); let score = 0; if(diff < 8) score = 100; else if(diff < 20) score = 60; else score = 10; endMinigame(ingredientKey, score); };
+                const btn = document.getElementById('stop-btn'); btn.addEventListener('click', stopKnife); btn.addEventListener('touchstart', stopKnife);
+            }
+            else if (ingredientKey === 'milk') {
+                gameHTML += `
+                    <p class="mb-4 text-gray-600 font-bold">指（マウス）を <span class="text-blue-500">右へスライド</span> して注ごう！</p>
+                    <div id="milk-zone" class="relative w-full h-48 bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden cursor-e-resize touch-none">
+                        <div class="flex items-end gap-2 pointer-events-none">
+                             <div id="milk-carton" class="text-6xl text-blue-500 transition-transform duration-75 origin-bottom-right" style="transform: rotate(0deg)"><i class="fa-solid fa-wine-bottle"></i></div>
+                             <div class="w-16 h-24 border-2 border-gray-400 rounded-b-lg relative bg-white overflow-hidden ml-4"><div id="milk-level" class="absolute bottom-0 w-full bg-white transition-all duration-100" style="height:0%"></div></div>
+                        </div>
+                    </div>
+                    <div class="mt-2 text-center text-sm font-bold text-gray-500" id="tilt-feedback">水平</div>
+                `;
+                minigameCard.innerHTML = gameHTML;
+                const zone = document.getElementById('milk-zone'); const carton = document.getElementById('milk-carton'); const level = document.getElementById('milk-level'); const feedback = document.getElementById('tilt-feedback'); let fill = 0; let gameOver = false;
+                const updateTilt = (clientX) => {
+                    if (gameOver) return;
+                    const rect = zone.getBoundingClientRect(); let ratio = (clientX - rect.left) / rect.width; if (ratio < 0) ratio = 0; if (ratio > 1) ratio = 1;
+                    const angle = ratio * 100; carton.style.transform = `rotate(${angle}deg)`; 
+                    if (angle > 60 && angle < 75) { fill += 1; level.style.backgroundColor = "#E0F2FE"; feedback.innerText = "完ぺき！"; feedback.className = "mt-2 text-center text-sm font-bold text-green-500"; } 
+                    else if (angle >= 75) { fill += 0.5; level.style.backgroundColor = "#FCA5A5"; feedback.innerText = "早い！"; feedback.className = "mt-2 text-center text-sm font-bold text-red-500"; } 
+                    else { feedback.innerText = "もっと傾けて..."; feedback.className = "mt-2 text-center text-sm font-bold text-gray-500"; }
+                    level.style.height = fill + "%"; if (fill >= 100) { gameOver = true; endMinigame(ingredientKey, 100); }
+                };
+                zone.addEventListener('mousemove', (e) => updateTilt(e.clientX)); zone.addEventListener('touchmove', (e) => { e.preventDefault(); updateTilt(e.touches[0].clientX); });
+            }
+            else if (ingredientKey === 'choco') {
+                gameHTML += `
+                    <p class="mb-2 text-gray-600 font-bold">消える前にチョコを捕まえろ！</p>
+                    <div id="choco-board" class="w-full h-64 bg-amber-50 rounded-xl relative overflow-hidden border-2 border-amber-100 cursor-crosshair touch-manipulation"></div>
+                    <div class="text-right font-bold text-amber-800" id="choco-counter">0/5</div>
+                `;
+                minigameCard.innerHTML = gameHTML;
+                const board = document.getElementById('choco-board'); const counter = document.getElementById('choco-counter'); let caught = 0; let total = 0; const max = 5;
+                const spawnChoco = () => { if (total >= max) { let score = (caught / max) * 100; setTimeout(() => endMinigame(ingredientKey, Math.round(score)), 500); return; } total++;
+                    const chip = document.createElement('div'); chip.className = "absolute text-4xl cursor-pointer transition-transform hover:scale-110 active:scale-90 select-none"; chip.innerHTML = "🍫"; chip.style.left = Math.random() * 80 + 10 + "%"; chip.style.top = Math.random() * 80 + 10 + "%";
+                    const catchChip = (e) => { if(e) e.preventDefault(); caught++; counter.innerText = `${caught}/${max}`; chip.remove(); };
+                    chip.onmousedown = catchChip; chip.ontouchstart = catchChip; board.appendChild(chip); setTimeout(() => { if(chip.parentNode) chip.remove(); }, 1200); setTimeout(spawnChoco, 1500);
+                };
+                spawnChoco();
+            }
+        }
+
+        function endMinigame(key, score) {
+            minigameCard.innerHTML = `
+                <h3 class="text-3xl font-bold ${score > 50 ? 'text-green-500' : 'text-orange-500'} mb-2">${score === 100 ? 'パーフェクト！' : score > 50 ? 'よくできました！' : 'おしい！'}</h3>
+                <div class="text-6xl font-bold text-gray-800 mb-4 animate-bounce">${score} 点</div>
+            `;
+            setTimeout(() => {
+                state.ingredients[key].done = true; state.ingredients[key].score = score; state.score += score;
+                minigameCard.classList.add('opacity-0', 'scale-95'); minigameCard.classList.remove('opacity-100', 'scale-100');
+                setTimeout(() => { minigameOverlay.classList.add('hidden'); render(); }, 300);
+            }, 1500);
+        }
+
+        function startConfetti() {
+            confettiCanvas.classList.remove('hidden'); const ctx = confettiCanvas.getContext('2d'); confettiCanvas.width = window.innerWidth; confettiCanvas.height = window.innerHeight;
+            const particles = []; const colors = ['#F472B6', '#FBBF24', '#60A5FA', '#34D399', '#A78BFA'];
+            function createParticle() { return { x: Math.random() * confettiCanvas.width, y: -20, size: Math.random() * 10 + 5, color: colors[Math.floor(Math.random() * colors.length)], speed: Math.random() * 3 + 2, angle: Math.random() * 360, spin: Math.random() * 5 - 2 }; }
+            for(let i=0; i<100; i++) particles.push(createParticle());
+            function animate() {
+                ctx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+                particles.forEach((p, i) => { p.y += p.speed; p.angle += p.spin; ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.angle * Math.PI / 180); ctx.fillStyle = p.color; ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size); ctx.restore(); if(p.y > confettiCanvas.height) { particles[i] = createParticle(); } });
+                requestAnimationFrame(animate);
+            }
+            animate();
+        }
+
+        render();
+    </script>
+</body>
+</html>
